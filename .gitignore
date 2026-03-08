@@ -1,1 +1,5 @@
 .env
+knowledge_base/
+rag_index.faiss
+rag_metadata.json
+__pycache__/

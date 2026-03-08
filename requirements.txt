@@ -1,2 +1,10 @@
 ﻿openai
 python-dotenv
+streamlit
+langchain
+langchain-openai
+faiss-cpu
+pypdf
+tiktoken
+langchain-text-splitters
+dropbox
