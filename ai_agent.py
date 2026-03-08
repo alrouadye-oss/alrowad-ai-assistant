@@ -25,16 +25,20 @@ RAG_INSTRUCTION = (
 
 KNOWLEDGE_BASE_PATH = KNOWLEDGE_BASE_DIR
 
+# Lazy client — created only when first needed, not at import time
+_client = None
 
-API_KEY = _get_secret("API_KEY")
-BASE_URL = _get_secret("BASE_URL")
 
-if not API_KEY:
-    raise ValueError("API_KEY is missing in .env")
-if not BASE_URL:
-    raise ValueError("BASE_URL is missing in .env")
-
-client = OpenAI(api_key=API_KEY, base_url=BASE_URL)
+def _get_client():
+    """Create OpenAI client on first call (avoids crashing the module at import)."""
+    global _client
+    if _client is None:
+        api_key = _get_secret("API_KEY")
+        base_url = _get_secret("BASE_URL")
+        if not api_key or not base_url:
+            raise ValueError("API_KEY or BASE_URL is missing from secrets / .env")
+        _client = OpenAI(api_key=api_key, base_url=base_url)
+    return _client
 
 
 def ask_ai_agent(prompt: str) -> str:
@@ -54,6 +58,7 @@ def ask_ai_agent(prompt: str) -> str:
     else:
         user_message = prompt
 
+    client = _get_client()
     response = client.chat.completions.create(
         model="gpt-4o-mini",
         timeout=30,
