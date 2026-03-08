@@ -25,10 +25,12 @@ def sync_dropbox_files(local_folder: str = None) -> List[str]:
         local_folder = KNOWLEDGE_BASE_DIR
     load_dotenv()
     
-    access_token = os.getenv("DROPBOX_ACCESS_TOKEN")
+    app_key = os.getenv("DROPBOX_APP_KEY")
+    app_secret = os.getenv("DROPBOX_APP_SECRET")
+    refresh_token = os.getenv("DROPBOX_REFRESH_TOKEN")
     
-    if not access_token:
-        print("Dropbox access token missing. Skipping sync.")
+    if not app_key or not app_secret or not refresh_token:
+        print("[Dropbox] Missing one or more keys (DROPBOX_APP_KEY, DROPBOX_APP_SECRET, DROPBOX_REFRESH_TOKEN). Skipping sync.")
         return []
         
     updated_files = []
@@ -43,12 +45,16 @@ def sync_dropbox_files(local_folder: str = None) -> List[str]:
         sync_meta = {}
         
     try:
-        dbx = dropbox.Dropbox(access_token)
+        dbx = dropbox.Dropbox(
+            app_key=app_key,
+            app_secret=app_secret,
+            oauth2_refresh_token=refresh_token
+        )
         
-        # -- Token permission check --
+        # -- Connection verification --
         try:
             account = dbx.users_get_current_account()
-            print(f"[Dropbox] Connected as: {account.name.display_name}")
+            print(f"[Dropbox] Dropbox connection successful - Connected as: {account.name.display_name}")
         except Exception as auth_err:
             print(f"[Dropbox] WARNING: Token may lack permissions (files.content.read): {auth_err}")
         
