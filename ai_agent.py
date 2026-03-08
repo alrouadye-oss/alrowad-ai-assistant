@@ -4,8 +4,6 @@ import traceback
 
 from openai import OpenAI
 
-from rag_system import similarity_search, KNOWLEDGE_BASE_DIR, _get_secret
-
 
 SYSTEM_INSTRUCTIONS = """
 أنت مهندس صيانة في مركز الرواد. ممنوع إعطاء إجابات عامة.
@@ -23,30 +21,42 @@ RAG_INSTRUCTION = (
     "واختم إجابتك بعبارة: 'بناءً على المعارف العامة للمركز...'."
 )
 
-KNOWLEDGE_BASE_PATH = KNOWLEDGE_BASE_DIR
 
-# Lazy client — created only when first needed, not at import time
+def _get_secret(key, default=None):
+    """Read from st.secrets (cloud) first, then os.getenv (local)."""
+    try:
+        import streamlit as st
+        return st.secrets[key]
+    except Exception:
+        from dotenv import load_dotenv
+        load_dotenv()
+        return os.getenv(key, default)
+
+
+# Lazy client — only created when ask_ai_agent is called
 _client = None
 
 
 def _get_client():
-    """Create OpenAI client on first call (avoids crashing the module at import)."""
     global _client
     if _client is None:
         api_key = _get_secret("API_KEY")
         base_url = _get_secret("BASE_URL")
         if not api_key or not base_url:
-            raise ValueError("API_KEY or BASE_URL is missing from secrets / .env")
+            raise ValueError("API_KEY or BASE_URL is missing from st.secrets / .env")
         _client = OpenAI(api_key=api_key, base_url=base_url)
     return _client
 
 
 def ask_ai_agent(prompt: str) -> str:
+    # Import rag_system INSIDE the function to prevent circular imports
+    from rag_system import similarity_search, KNOWLEDGE_BASE_DIR
+
     greetings = ["سلام", "مرحبا", "أهلا", "أهلاً", "من أنت", "السلام عليكم", "هلا", "مرحباً"]
     if any(greet in prompt.lower() for greet in greetings) and len(prompt) < 30:
         return "أهلاً بك! أنا المهندس الآلي لمركز الرواد - سيئون. كيف يمكنني مساعدتك في أنظمة الطاقة الشمسية والليثيوم اليوم؟"
 
-    context_chunks = similarity_search(prompt, k=8, knowledge_folder=KNOWLEDGE_BASE_PATH)
+    context_chunks = similarity_search(prompt, k=8, knowledge_folder=KNOWLEDGE_BASE_DIR)
 
     if context_chunks:
         context_text = "\n\n---\n\n".join(context_chunks)

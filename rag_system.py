@@ -34,12 +34,19 @@ KNOWLEDGE_BASE_DIR = os.path.join(BASE_DIR, "knowledge_base")
 def sync_dropbox_files(local_folder: str = None) -> List[str]:
     if local_folder is None:
         local_folder = KNOWLEDGE_BASE_DIR
-    app_key = _get_secret("DROPBOX_APP_KEY")
-    app_secret = _get_secret("DROPBOX_APP_SECRET")
-    refresh_token = _get_secret("DROPBOX_REFRESH_TOKEN")
+    # Read Dropbox keys - st.secrets (cloud) first, os.getenv (local) fallback
+    try:
+        import streamlit as st
+        app_key = st.secrets["DROPBOX_APP_KEY"]
+        app_secret = st.secrets["DROPBOX_APP_SECRET"]
+        refresh_token = st.secrets["DROPBOX_REFRESH_TOKEN"]
+    except Exception:
+        app_key = os.getenv("DROPBOX_APP_KEY")
+        app_secret = os.getenv("DROPBOX_APP_SECRET")
+        refresh_token = os.getenv("DROPBOX_REFRESH_TOKEN")
     
     if not app_key or not app_secret or not refresh_token:
-        print("[Dropbox] Missing one or more keys (DROPBOX_APP_KEY, DROPBOX_APP_SECRET, DROPBOX_REFRESH_TOKEN). Skipping sync.")
+        print("[Dropbox] Missing keys (DROPBOX_APP_KEY, DROPBOX_APP_SECRET, DROPBOX_REFRESH_TOKEN). Skipping sync.")
         return []
         
     updated_files = []
