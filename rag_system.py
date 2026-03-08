@@ -13,12 +13,16 @@ from pypdf import PdfReader
 
 import shutil
 
-VECTOR_INDEX_PATH = "rag_index.faiss"
-VECTOR_META_PATH = "rag_metadata.json"
-SYNC_META_PATH = "sync_metadata.json"
+BASE_DIR = os.getcwd()
+VECTOR_INDEX_PATH = os.path.join(BASE_DIR, "rag_index.faiss")
+VECTOR_META_PATH = os.path.join(BASE_DIR, "rag_metadata.json")
+SYNC_META_PATH = os.path.join(BASE_DIR, "sync_metadata.json")
+KNOWLEDGE_BASE_DIR = os.path.join(BASE_DIR, "knowledge_base")
 
 
-def sync_dropbox_files(local_folder: str = "knowledge_base") -> List[str]:
+def sync_dropbox_files(local_folder: str = None) -> List[str]:
+    if local_folder is None:
+        local_folder = KNOWLEDGE_BASE_DIR
     load_dotenv()
     
     access_token = os.getenv("DROPBOX_ACCESS_TOKEN")
@@ -41,23 +45,32 @@ def sync_dropbox_files(local_folder: str = "knowledge_base") -> List[str]:
     try:
         dbx = dropbox.Dropbox(access_token)
         
+        # -- Token permission check --
+        try:
+            account = dbx.users_get_current_account()
+            print(f"[Dropbox] Connected as: {account.name.display_name}")
+        except Exception as auth_err:
+            print(f"[Dropbox] WARNING: Token may lack permissions (files.content.read): {auth_err}")
+        
         folder = Path(local_folder)
-        folder.mkdir(parents=True, exist_ok=True)
+        os.makedirs(str(folder), exist_ok=True)
+        print(f"[Sync] Local folder: {folder}")
         
         results = dbx.files_list_folder('/Serivce manual')
+        
+        # Count all PDF entries for diagnostics
+        all_pdf_names = []
         
         while True:
             for entry in results.entries:
                 if isinstance(entry, dropbox.files.FileMetadata) and entry.name.lower().endswith('.pdf'):
+                    all_pdf_names.append(entry.name)
                     local_path = folder / entry.name
                     server_modified_str = str(entry.server_modified)
                     
                     # Check if file is new or modified
                     if entry.name not in sync_meta or sync_meta[entry.name] != server_modified_str or not local_path.exists():
-                        try:
-                            print(f"Downloading file from Dropbox: {entry.name.encode('utf-8', 'ignore').decode('utf-8')}")
-                        except Exception:
-                            pass
+                        print(f"[Sync] Downloading: {entry.name}")
                         dbx.files_download_to_file(str(local_path), entry.path_lower)
                         sync_meta[entry.name] = server_modified_str
                         updated_files.append(str(local_path))
@@ -65,12 +78,17 @@ def sync_dropbox_files(local_folder: str = "knowledge_base") -> List[str]:
             if not results.has_more:
                 break
             results = dbx.files_list_folder_continue(results.cursor)
+        
+        print(f"[Sync] Found {len(all_pdf_names)} PDF files in Dropbox")
+        print(f"[Sync] Downloaded {len(updated_files)} new/updated files")
                     
         # Save updated sync metadata
         sync_meta_file.write_text(json.dumps(sync_meta, ensure_ascii=False, indent=4), encoding="utf-8")
         
+    except dropbox.exceptions.AuthError as ae:
+        print(f"[Dropbox] AUTH ERROR - Token invalid or lacks 'files.content.read' scope: {ae}")
     except Exception as e:
-        print(f"Error syncing with Dropbox: {e}")
+        print(f"[Dropbox] Error syncing: {e}")
         
     return updated_files
 
@@ -247,10 +265,12 @@ def _load_vector_database(
 def similarity_search(
     query: str,
     k: int = 8,
-    knowledge_folder: str = "knowledge_base",
+    knowledge_folder: str = None,
     index_path: str = VECTOR_INDEX_PATH,
     metadata_path: str = VECTOR_META_PATH,
 ) -> List[str]:
+    if knowledge_folder is None:
+        knowledge_folder = KNOWLEDGE_BASE_DIR
     if not query.strip():
         return []
 

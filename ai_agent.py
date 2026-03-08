@@ -5,7 +5,7 @@ import traceback
 from dotenv import load_dotenv
 from openai import OpenAI
 
-from rag_system import similarity_search
+from rag_system import similarity_search, KNOWLEDGE_BASE_DIR
 
 
 SYSTEM_INSTRUCTIONS = """
@@ -24,7 +24,7 @@ RAG_INSTRUCTION = (
     "واختم إجابتك بعبارة: 'بناءً على المعارف العامة للمركز...'."
 )
 
-KNOWLEDGE_BASE_PATH = "knowledge_base"
+KNOWLEDGE_BASE_PATH = KNOWLEDGE_BASE_DIR
 
 
 load_dotenv()

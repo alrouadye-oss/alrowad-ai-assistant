@@ -1,7 +1,30 @@
-﻿import streamlit as st
+﻿import json
+import os
+import streamlit as st
 
 from ai_agent import ask_ai_agent
-from rag_system import sync_dropbox_files, create_or_update_vector_database, VECTOR_INDEX_PATH, VECTOR_META_PATH
+from rag_system import (
+    sync_dropbox_files,
+    create_or_update_vector_database,
+    VECTOR_INDEX_PATH,
+    VECTOR_META_PATH,
+    KNOWLEDGE_BASE_DIR,
+)
+
+# ── Initialize stats from existing metadata on first load ──────────────
+if "pdf_count" not in st.session_state or "total_chars" not in st.session_state:
+    try:
+        if os.path.exists(VECTOR_META_PATH):
+            with open(VECTOR_META_PATH, "r", encoding="utf-8") as f:
+                _meta = json.load(f)
+            st.session_state["pdf_count"] = _meta.get("pdf_count", 0)
+            st.session_state["total_chars"] = _meta.get("total_chars", 0)
+        else:
+            st.session_state.setdefault("pdf_count", 0)
+            st.session_state.setdefault("total_chars", 0)
+    except Exception:
+        st.session_state.setdefault("pdf_count", 0)
+        st.session_state.setdefault("total_chars", 0)
 
 
 st.set_page_config(page_title="المهندس الآلي - الرواد", page_icon="⚡", layout="wide")
@@ -164,15 +187,19 @@ with st.sidebar:
         with st.spinner("جاري المزامنة مع دروبكس وبناء الكشاف..."):
             updated_files = sync_dropbox_files()
             pdf_count, total_chars = create_or_update_vector_database(
-                "knowledge_base", 
-                VECTOR_INDEX_PATH, 
+                KNOWLEDGE_BASE_DIR,
+                VECTOR_INDEX_PATH,
                 VECTOR_META_PATH,
                 new_files=updated_files
             )
             
             st.session_state["pdf_count"] = pdf_count
             st.session_state["total_chars"] = total_chars
-            st.success("تم التحديث بنجاح!")
+            
+            # Detailed success message with real numbers
+            char_display = f"{total_chars / 1_000:.0f}" if total_chars > 0 else "0"
+            st.success(f"تم التحديث بنجاح! تم العثور على {pdf_count} ملفاً وتحديث {char_display} ألف حرف")
+            st.rerun()
 
     st.markdown("---")
     st.markdown("### 💬 سجل المحادثات")
