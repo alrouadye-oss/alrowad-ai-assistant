@@ -186,6 +186,10 @@ with st.sidebar:
     if st.button("مزامنة وتحديث الملفات 🔄"):
         with st.spinner("جاري المزامنة مع دروبكس وبناء الكشاف..."):
             updated_files = sync_dropbox_files()
+            
+            # Diagnostic: show found/downloaded counts in UI
+            st.write(f"📁 تم العثور على {len(updated_files)} ملف جديد/محدّث من Dropbox")
+            
             pdf_count, total_chars = create_or_update_vector_database(
                 KNOWLEDGE_BASE_DIR,
                 VECTOR_INDEX_PATH,
@@ -195,6 +199,9 @@ with st.sidebar:
             
             st.session_state["pdf_count"] = pdf_count
             st.session_state["total_chars"] = total_chars
+            
+            # Diagnostic: show indexing results
+            st.write(f"📊 الفهرس: {pdf_count} ملفاً - {total_chars:,} حرف")
             
             # Detailed success message with real numbers
             char_display = f"{total_chars / 1_000:.0f}" if total_chars > 0 else "0"

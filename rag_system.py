@@ -13,6 +13,17 @@ from pypdf import PdfReader
 
 import shutil
 
+load_dotenv()
+
+
+def _get_secret(key: str, default=None):
+    """Try st.secrets first (Streamlit Cloud), fall back to os.getenv (local)."""
+    try:
+        import streamlit as st
+        return st.secrets[key]
+    except Exception:
+        return os.getenv(key, default)
+
 BASE_DIR = os.getcwd()
 VECTOR_INDEX_PATH = os.path.join(BASE_DIR, "rag_index.faiss")
 VECTOR_META_PATH = os.path.join(BASE_DIR, "rag_metadata.json")
@@ -23,11 +34,9 @@ KNOWLEDGE_BASE_DIR = os.path.join(BASE_DIR, "knowledge_base")
 def sync_dropbox_files(local_folder: str = None) -> List[str]:
     if local_folder is None:
         local_folder = KNOWLEDGE_BASE_DIR
-    load_dotenv()
-    
-    app_key = os.getenv("DROPBOX_APP_KEY")
-    app_secret = os.getenv("DROPBOX_APP_SECRET")
-    refresh_token = os.getenv("DROPBOX_REFRESH_TOKEN")
+    app_key = _get_secret("DROPBOX_APP_KEY")
+    app_secret = _get_secret("DROPBOX_APP_SECRET")
+    refresh_token = _get_secret("DROPBOX_REFRESH_TOKEN")
     
     if not app_key or not app_secret or not refresh_token:
         print("[Dropbox] Missing one or more keys (DROPBOX_APP_KEY, DROPBOX_APP_SECRET, DROPBOX_REFRESH_TOKEN). Skipping sync.")
@@ -62,7 +71,15 @@ def sync_dropbox_files(local_folder: str = None) -> List[str]:
         os.makedirs(str(folder), exist_ok=True)
         print(f"[Sync] Local folder: {folder}")
         
-        results = dbx.files_list_folder('/Serivce manual')
+        # Try configured Dropbox path, fall back to root if not found
+        dropbox_path = '/Serivce manual'
+        try:
+            results = dbx.files_list_folder(dropbox_path)
+            print(f"[Sync] Listing Dropbox folder: {dropbox_path}")
+        except dropbox.exceptions.ApiError:
+            print(f"[Sync] Folder '{dropbox_path}' not found, trying root '/'")
+            dropbox_path = ''
+            results = dbx.files_list_folder(dropbox_path)
         
         # Count all PDF entries for diagnostics
         all_pdf_names = []
@@ -100,10 +117,8 @@ def sync_dropbox_files(local_folder: str = None) -> List[str]:
 
 
 def _build_embeddings_client() -> OpenAIEmbeddings:
-    load_dotenv()
-
-    api_key = os.getenv("API_KEY")
-    base_url = os.getenv("BASE_URL")
+    api_key = _get_secret("API_KEY")
+    base_url = _get_secret("BASE_URL")
 
     if not api_key:
         raise ValueError("API_KEY is missing in .env")

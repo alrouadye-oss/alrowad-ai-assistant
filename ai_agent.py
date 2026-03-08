@@ -2,10 +2,9 @@
 import sys
 import traceback
 
-from dotenv import load_dotenv
 from openai import OpenAI
 
-from rag_system import similarity_search, KNOWLEDGE_BASE_DIR
+from rag_system import similarity_search, KNOWLEDGE_BASE_DIR, _get_secret
 
 
 SYSTEM_INSTRUCTIONS = """
@@ -27,10 +26,8 @@ RAG_INSTRUCTION = (
 KNOWLEDGE_BASE_PATH = KNOWLEDGE_BASE_DIR
 
 
-load_dotenv()
-
-API_KEY = os.getenv("API_KEY")
-BASE_URL = os.getenv("BASE_URL")
+API_KEY = _get_secret("API_KEY")
+BASE_URL = _get_secret("BASE_URL")
 
 if not API_KEY:
     raise ValueError("API_KEY is missing in .env")
